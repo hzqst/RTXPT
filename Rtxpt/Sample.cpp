@@ -608,7 +608,7 @@ void Sample::SceneLoaded( )
 
     m_ui.ShaderReloadRequested = true;  // we have to re-create shader hit table
     m_ui.EnableAnimations = false;
-    m_ui.RealtimeMode = false;
+    m_ui.RealtimeMode = true;
 
     std::shared_ptr<SampleSettings> settings = m_scene->GetSampleSettingsNode();
     if (settings != nullptr)
