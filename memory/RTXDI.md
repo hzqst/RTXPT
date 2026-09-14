@@ -1,3 +1,9 @@
+---
+title: RTXDI
+type: note
+permalink: rtxpt-fork/rtxdi
+---
+
 # RTXDI
 
 ## Overview

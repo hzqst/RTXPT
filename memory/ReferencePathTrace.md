@@ -1,3 +1,9 @@
+---
+title: ReferencePathTrace
+type: note
+permalink: rtxpt-fork/reference-path-trace
+---
+
 # ReferencePathTrace
 
 ## Overview

@@ -1,3 +1,9 @@
+---
+title: Rendering Pipeline
+type: note
+permalink: rtxpt-fork/rendering-pipeline
+---
+
 # RTXPT 渲染管线
 
 ## 概览

@@ -1,3 +1,9 @@
+---
+title: EnvMapBaker
+type: note
+permalink: rtxpt-fork/env-map-baker
+---
+
 # EnvMapBaker
 
 ## 概览

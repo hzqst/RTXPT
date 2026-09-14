@@ -1,3 +1,9 @@
+---
+title: PathTrace
+type: note
+permalink: rtxpt-fork/path-trace
+---
+
 # PathTrace
 
 ## Overview

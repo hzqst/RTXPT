@@ -1,3 +1,9 @@
+---
+title: Suggested Commands
+type: note
+permalink: rtxpt-fork/suggested-commands
+---
+
 # 常用命令
 
 以下命令以 Windows PowerShell、仓库根 `D:\RTXPT` 为默认工作目录。
@@ -20,7 +26,7 @@ Get-Content .\README.md -TotalCount 120
 Select-String -Path .\Rtxpt\*.cpp -Pattern "WinMain"
 ```
 
-优先使用 Serena：先 `list_memories`，再按需 `read_memory`；查源码优先 `get_symbols_overview`、`find_symbol`、`find_referencing_symbols`、`search_for_pattern`。
+优先使用 Basic Memory：先 `search_notes`，再按需 `read_note`；查源码优先 Serena 的 `get_symbols_overview`、`find_symbol`、`find_referencing_symbols`、`search_for_pattern`。
 
 ## 配置与构建
 

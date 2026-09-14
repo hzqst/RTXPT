@@ -1,6 +1,12 @@
+---
+title: Task Completion Checklist
+type: note
+permalink: rtxpt-fork/task-completion-checklist
+---
+
 # 任务完成检查
 
-- 遵循 `CLAUDE.md`：先用 Serena memories 获取高层上下文；源码分析优先用 Serena symbol/search；仅在需要时读取具体文件或符号。
+- 遵循 `CLAUDE.md`：先用 Basic Memory notes 获取高层上下文（`search_notes` / `read_note`）；源码分析优先用 Serena symbol/search；仅在需要时读取具体文件或符号。
 - 遵循用户全局规则：除非用户明确要求，不要在完成代码或修复后自行运行 build/test；如验证对交付很关键，应说明建议执行的命令和原因，等待用户授权或明确记录未执行。
 - 修改范围保持局部，避免无关重构、第三方依赖改动、生成物改动和大规模格式化。
 - 涉及公共 CPU/GPU contract 的改动要额外检查：HLSL shared headers、C++ struct/layout、resource bindings、shader macro、CMake shader compile config、RTXDI/NRD/OMM integration。

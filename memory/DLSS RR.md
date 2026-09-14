@@ -1,3 +1,9 @@
+---
+title: DLSS RR
+type: note
+permalink: rtxpt-fork/dlss-rr
+---
+
 # DLSS_RR
 
 ## Overview

@@ -1,3 +1,9 @@
+---
+title: VBufferExport
+type: note
+permalink: rtxpt-fork/v-buffer-export
+---
+
 # VBufferExport
 
 ## Overview

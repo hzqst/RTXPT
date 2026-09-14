@@ -1,3 +1,9 @@
+---
+title: LightsBaker
+type: note
+permalink: rtxpt-fork/lights-baker
+---
+
 # LightsBaker
 
 ## 概览

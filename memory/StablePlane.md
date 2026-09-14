@@ -1,3 +1,9 @@
+---
+title: StablePlane
+type: note
+permalink: rtxpt-fork/stable-plane
+---
+
 # StablePlane
 
 ## Overview

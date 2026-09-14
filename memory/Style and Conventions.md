@@ -1,3 +1,9 @@
+---
+title: Style and Conventions
+type: note
+permalink: rtxpt-fork/style-and-conventions
+---
+
 # 代码风格与约定
 
 - 主要语言：C++20 与 HLSL/HLSLI；CMake 构建。

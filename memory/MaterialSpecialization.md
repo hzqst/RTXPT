@@ -1,3 +1,9 @@
+---
+title: MaterialSpecialization
+type: note
+permalink: rtxpt-fork/material-specialization
+---
+
 # MaterialSpecialization
 
 ## 概览

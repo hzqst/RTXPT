@@ -1,3 +1,9 @@
+---
+title: Architecture Entrypoints
+type: note
+permalink: rtxpt-fork/architecture-entrypoints
+---
+
 # 架构与入口
 
 ## 顶层目录

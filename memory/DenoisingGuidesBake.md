@@ -1,3 +1,9 @@
+---
+title: DenoisingGuidesBake
+type: note
+permalink: rtxpt-fork/denoising-guides-bake
+---
+
 # DenoisingGuidesBake
 
 ## Overview

@@ -1,3 +1,9 @@
+---
+title: Denoise
+type: note
+permalink: rtxpt-fork/denoise
+---
+
 # Denoise
 
 ## Overview

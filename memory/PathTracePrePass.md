@@ -1,3 +1,9 @@
+---
+title: PathTracePrePass
+type: note
+permalink: rtxpt-fork/path-trace-pre-pass
+---
+
 # PathTracePrePass
 
 ## Overview
