@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
 *
 * NVIDIA CORPORATION and its licensors retain all intellectual property
 * and proprietary rights in and to this software, related documentation
@@ -14,6 +14,7 @@
 #include "SampleCommon/SampleCommon.h"
 
 #include "SampleCommon/CommandLine.h"
+#include "SampleCommon/GpuProfiler.h"
 #include "SampleUI.h"
 
 #include <donut/app/ApplicationBase.h>
@@ -49,6 +50,7 @@ class ComputeShaderVariant;
 
 class Sample : public donut::app::ApplicationBase
 {
+    GpuProfiler m_gpuProfiler;
     // static constexpr uint32_t c_PathTracerVariants   = 6; // see shaders.cfg and CreatePTPipeline for details on variants
 
 public:

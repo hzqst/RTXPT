@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
 *
 * NVIDIA CORPORATION and its licensors retain all intellectual property
 * and proprietary rights in and to this software, related documentation
@@ -1579,6 +1579,10 @@ void Sample::RtxdiSetupFrame(nvrhi::IFramebuffer* framebuffer, PathTracerCameraD
 
 bool Sample::ShouldRenderUnfocused()
 {
+    // A profiling run must keep producing samples when the console takes focus.
+    if (!m_cmdLine.gpuProfileCSV.empty())
+        return true;
+
     if (m_frameIndex < 16 || m_ui.ResetAccumulation || m_ui.ResetRealtimeCaches || m_captureScriptManager->IsDoingWork() )
     {
         // Make sure we at least run one render frame to allow expensive resource creation to happen in background, and to allow at least somewhat decent convergence so when user alt-tabs they get a nice image
@@ -1904,6 +1908,10 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
 
     PreRender();
 
+    // Apply after UI presets so the benchmark override reaches shader compilation.
+    if (m_cmdLine.neeCandidateSamples >= 0)
+        m_ui.NEECandidateSamples = dm::clamp(m_cmdLine.neeCandidateSamples, 1, RTXPT_LIGHTING_MAX_SAMPLE_COUNT);
+
     StreamlinePreRender();
 
  
@@ -2181,6 +2189,24 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
 
         m_commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
+        // Start after scene/lighting preparation, matching the port's Render interval.
+        // Skip resource recreation frames that can reopen the command list.
+        if (!needNewPasses && GetFrameIndex() > 16)
+            m_gpuProfiler.BeginFrame(GetDevice(), m_commandList, m_cmdLine.gpuProfileCSV);
+        if (!m_cmdLine.gpuProfileCSV.empty() && GetFrameIndex() == 120)
+        {
+            const auto& pt = constants.ptConsts;
+            const auto pos = m_camera.GetPosition();
+            const auto dir = m_camera.GetDir();
+            std::ofstream settingsFile(m_cmdLine.gpuProfileCSV + ".settings.txt");
+            settingsFile << StringFormat("GPU profile settings: render=%ux%u camera=(%.6f,%.6f,%.6f) "
+                "dir=(%.6f,%.6f,%.6f) fovRadians=%.6f bounces=%u diffuse=%u spp=%u "
+                "NEE=%u type=%u candidates=%u full=%u planes=%u DI=%u GI=%u rrPreset=%d",
+                pt.imageWidth, pt.imageHeight, pos.x, pos.y, pos.z, dir.x, dir.y, dir.z,
+                m_cameraVerticalFOV, pt.bounceCount, pt.diffuseBounceCount, m_ui.ActualSamplesPerPixel(),
+                pt.NEEEnabled, pt.NEEType, pt.NEECandidateSamples, pt.NEEFullSamples,
+                pt._activeStablePlaneCount, pt.useReSTIRDI, pt.useReSTIRGI, int(m_ui.DLSRRPreset)) << '\n';
+        }
         SampleRenderCode(framebuffer, m_commandList, constants);
 
         PostProcessAA(framebuffer, needNewPasses || m_ui.ResetRealtimeCaches);
@@ -2191,6 +2217,7 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
     fullscreenView.SetViewport(windowViewport);
     fullscreenView.UpdateCache();
 
+    m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::PostProcess);
     PostProcessPreToneMapping(m_commandList, fullscreenView);   // writing to m_renderTargets->ProcessedOutputColor
 
     //Tone Mapping; it will read from m_renderTargets->ProcessedOutputColor and write into m_renderTargets->LdrColor; in case tonemapping is disabled, it's just a passthrough
@@ -2212,6 +2239,8 @@ void Sample::Render(nvrhi::IFramebuffer* framebuffer)
     m_commandList->beginMarker("Blit");
     m_CommonPasses->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, m_bindingCache.get());
     m_commandList->endMarker();
+    m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::PostProcess);
+    m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::Total);
 
     if (m_ui.ShowDebugLines == true)
     {
@@ -2457,6 +2486,7 @@ void Sample::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants &
     {
         {
             RAII_SCOPE(m_commandList->beginMarker("PathTracePrePass"); , m_commandList->endMarker(); );
+            RAII_SCOPE(m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::Build);, m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::Build););
 
             m_commandList->setTextureState(m_renderTargets->Depth, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
             m_commandList->setTextureState(m_renderTargets->ScreenMotionVectors, nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
@@ -2475,6 +2505,7 @@ void Sample::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants &
 
         {
             RAII_SCOPE(m_commandList->beginMarker("VBufferExport"); , m_commandList->endMarker(); );
+            RAII_SCOPE(m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::VBufferExport);, m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::VBufferExport););
 
             nvrhi::ComputeState state;
 		    state.bindings = { m_bindingSet, m_DescriptorTable->GetDescriptorTable() };
@@ -2492,10 +2523,13 @@ void Sample::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants &
     }
 
     // In realtime mode, ScreenMotionVectors reference mode ScreenMotionVectors should be 0
+    m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::LightsBaker);
     m_lightsBaker->UpdateEnd(m_commandList, *m_bindingCache, m_scene, m_materialsBaker, m_ommBaker, m_subInstanceBuffer, m_renderTargets->Depth, m_renderTargets->ScreenMotionVectors);  // <- in the future this will provide motion vectors except in case of reference mode
+    m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::LightsBaker);
 
     {
         RAII_SCOPE( m_commandList->beginMarker("PathTrace");, m_commandList->endMarker(); );
+        RAII_SCOPE(m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::Fill);, m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::Fill););
 
         state.shaderTable = ((useStablePlanes) ? (m_ptPipelineFillStablePlanes) : (m_ptPipelineReference))->GetShaderTable();
         state.bindings = { m_bindingSet, m_DescriptorTable->GetDescriptorTable() };
@@ -2540,6 +2574,7 @@ void Sample::PathTrace(nvrhi::IFramebuffer* framebuffer, const SampleConstants &
 
     {
         RAII_SCOPE(m_commandList->beginMarker("Denoising Guides Bake"); , m_commandList->endMarker(); );
+        RAII_SCOPE(m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::Guides);, m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::Guides););
 
         m_denoisingGuidesBaker->DenoiseSpecHitT(m_commandList, m_bindingSet);
         m_denoisingGuidesBaker->ComputeAvgLayerRadiance(m_commandList, m_bindingSet);
@@ -2714,8 +2749,12 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
             SampleMiniConstants miniConstants = { uint4(0, 0, 0, 0) };
             nvrhi::TextureDesc tdesc = m_renderTargets->OutputColor->getDesc();
             m_commandList->beginMarker("DLSSRR_PrepareInputs");
+            m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::RRPrepare);
             m_postProcess->Apply(m_commandList, PostProcess::ComputePassType::DLSSRRDenoiserPrepareInputs, m_constantBuffer, miniConstants, m_bindingSet, m_bindingLayout, tdesc.width, tdesc.height);
+            m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::RRPrepare);
             m_commandList->endMarker();
+
+            m_gpuProfiler.Begin(m_commandList, GpuProfiler::Stage::RR);
 
             static bool useSpecHitT = false; // it's buggy
             //if (ImGui::IsKeyPressed(ImGuiKey::ImGuiKey_G))
@@ -2755,6 +2794,7 @@ void Sample::PostProcessAA(nvrhi::IFramebuffer* framebuffer, bool reset)
 
             GetDeviceManager()->GetStreamline().EvaluateDLSSRR(m_commandList);
             m_commandList->clearState();
+            m_gpuProfiler.End(m_commandList, GpuProfiler::Stage::RR);
         }
         else if ( !m_ui.ActualUseStandaloneDenoiser() )
         {

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
 *
 * NVIDIA CORPORATION and its licensors retain all intellectual property
 * and proprietary rights in and to this software, related documentation
@@ -27,6 +27,8 @@ struct CommandLineOptions
 	bool useVulkan = false;
     bool stopAnimations = false;
 	bool disableSER = false;
+    std::string gpuProfileCSV;
+    int neeCandidateSamples = -1;
 
     std::string capturePath = "";
     bool captureSimple = false;
