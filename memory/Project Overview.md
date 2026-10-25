@@ -24,4 +24,6 @@ permalink: rtxpt-fork/project-overview
 - 验证：Release `Rtxpt`、`IntroSample` 构建通过；独立 `Testing/UnitTests` 的 `omm_bake_input_key_smoke` 通过（1/1）。运行时验证结果以本次交付说明为准。
 - 上述旧笔记关于“必须获得授权才运行 build/test”的描述不适用于本会话：当前用户规则要求执行相关验证。
 - 运行时验证补充：640x360 convergence-test 场景，DX12 + DLSS-RR + CSV profiling 自动截图退出码 0，生成正常图像及 47 行有效计时；关闭 profiling、不强制模式的默认运行自动截图同样退出码 0。Vulkan 与完整图像回归未执行。
-- 子模块同步后旧 NVRHI 的 `rtxmu/`、`thirdparty/DirectX-Headers/`、`thirdparty/Vulkan-Headers/` 不再被上游跟踪；未删除这些旧检出目录，Donut 的未跟踪状态来源于此，所有受跟踪子模块提交与标签一致。
+- 依赖升级补充：子模块递归同步至 v1.9.0 指定提交；旧 NVRHI 的 `rtxmu/`、`thirdparty/DirectX-Headers/`、`thirdparty/Vulkan-Headers/` 已确认无本地修改后清理；旧 NRD 生成文件 `Shaders/Include/NRDEncoding.hlsli` 也已清理。
+- Agility 缓存迁移经验：触发信号是源码默认 `1.619.6`，但现有 `build/CMakeCache.txt` 仍为 `1.619.0`；根因是 `set(... CACHE ...)` 不覆盖已有缓存。根 CMake 现仅迁移旧默认 `1.619.0` 到 `1.619.6`，保留其他版本或禁用选择。验证：重新配置已有 build 目录确认 SDK 路径与版本，重建 Rtxpt/IntroSample，核对 `bin/D3D12/D3D12Core.dll` 与 1.619.6 包 SHA256 一致，再运行 DX12 + DLSS-RR 自动截图。适用范围：从 v1.8.1 升级的现有构建目录。
+- 当前已核对下载依赖：Streamline 2.14.16（包内 DLSS SR/RR 310.9.16）、DXC 1.9.2609.5、Tracy 0.14.1、DirectX-Headers v1.717.0-preview、OptiX denoiser 3.0（SHA256 与上游固定值一致）。

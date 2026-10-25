@@ -171,6 +171,10 @@ endif()
 
 #----------------------------------------------------------------------------------------------------------------------
 # Get and unpack the Agility SDK
+if (RTXPT_D3D_AGILITY_SDK_VERSION_NAME STREQUAL "1.619.0")
+    # Migrate the v1.8.1 default retained in existing build caches.
+    set(RTXPT_D3D_AGILITY_SDK_VERSION_NAME "1.619.6" CACHE STRING "Optional Agility SDK version to download" FORCE)
+endif()
 set(RTXPT_D3D_AGILITY_SDK_VERSION_NAME "1.619.6" CACHE STRING "Optional Agility SDK version to download")
 set_property(CACHE RTXPT_D3D_AGILITY_SDK_VERSION_NAME PROPERTY STRINGS "1.619.6" "1.717.0-preview" "1.719.0-preview" "")
 
