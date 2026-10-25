@@ -12,30 +12,34 @@ RR. Results are polled before reading; a busy ring drops a sample instead of wai
 for the GPU. CSV values are milliseconds, and an unexecuted stage is `-1`.
 The file is flushed every 120 collected frames. Profiling keeps rendering while
 the window is unfocused; normal execution keeps its original focus behavior.
+With v1.9.0, CSV profiling disables the async compute prefix so timer queries
+remain on the graphics queue. The upstream Tracy profiler remains available.
 
 Stage boundaries match the Diligent port's path-trace/post-process interval:
 
 | Column | Work |
 | --- | --- |
 | Total | Before `SampleRenderCode` through final framebuffer blit |
-| BUILD | Stable-plane ray dispatch and its surrounding resource-state commands |
+| BUILD | Denoising-layer ray dispatch and its surrounding resource-state commands |
 | LightsBaker | `LightsBaker::UpdateEnd` |
 | FILL | Entire path-trace sample loop, including dispatch state and barriers |
-| Guides | Specular hit-distance denoise and average layer radiance |
-| RRPrepare | `DLSSRRDenoiserPrepareInputs` |
+| Guides | Specular hit-distance denoise and optional guide debug visualization |
+| RRPrepare | `PrepareDLSSRRGuides` |
 | RR | RR resource tagging/transitions, evaluation and state cleanup |
 | PostProcess | Pre-tone-map effects through tone mapping and final blit |
-| VBufferExport | Upstream's separate visibility-buffer export dispatch |
+| VBufferExport | Visibility-buffer export, executed only for depth/motion debug views |
 
 `Total` excludes scene/AS preparation, `UpdateLighting`, UI and Present. It is not
 the window-title frame time. It includes gaps between the named stages. The port
 does not have a separate VBufferExport dispatch. PostProcess includes upstream
 debug/zoom work if enabled, so disable visualization when comparing renderers.
 Resource-recreation frames and the first 16 application frames are not sampled.
-This integration has been built and measured on D3D12; Vulkan timing is unverified.
+The v1.9.0 integration was built in Release and smoke-tested on D3D12 with
+DLSS-RR at 640x360 using `convergence-test.scene.json`: automatic capture exited
+successfully and produced 47 timing rows. Vulkan timing remains unverified.
 
 At application frame 120, `<csv>.settings.txt` records the actual camera, resolution,
-bounce/sample counts, NEE settings, stable-plane count, ReSTIR state and RR preset.
+bounce/sample counts, NEE settings, denoising-layer count, ReSTIR state and RR preset.
 Use this to verify the configuration instead of relying only on command-line text.
 `--neeCandidateSamples N` overrides the candidate count after UI presets, before
 shader compilation; values are clamped to the supported range. Omit it to retain

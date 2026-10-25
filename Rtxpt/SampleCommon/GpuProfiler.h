@@ -1,103 +1,61 @@
-// Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+/*
+* Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
+*
+* NVIDIA CORPORATION and its licensors retain all intellectual property
+* and proprietary rights in and to this software, related documentation
+* and any modifications thereto.  Any use, reproduction, disclosure or
+* distribution of this software and related documentation without an express
+* license agreement from NVIDIA CORPORATION is strictly prohibited.
+*/
+
 #pragma once
 
 #include <nvrhi/nvrhi.h>
-#include <donut/core/log.h>
-#include <array>
-#include <fstream>
-#include <iomanip>
+#include <tracy/Tracy.hpp>
 
-// NVRHI D3D12 timer queries use timestamp pairs, including across Streamline.
-// Poll completed frames without waiting; drop samples if the ring is full.
-class GpuProfiler
+namespace tracy { struct SourceLocationData; }
+
+// Tracy GPU zones (D3D12 only for now). Begin/End are drop-ins for nvrhi beginMarker/endMarker and still emit them.
+// A zone may span a close/execute/open of its command list, but every list holding zones must execute before Present.
+namespace GpuProfiler
 {
-public:
-    enum class Stage { Total, Build, LightsBaker, Fill, Guides, RRPrepare, RR, PostProcess, VBufferExport, Count };
+    void Init(nvrhi::IDevice* device);
+    void Shutdown();        // GPU must be idle
+    void AfterPresent();    // once per frame, after the frame's last ExecuteCommandLists and right before FrameMark
 
-    void BeginFrame(nvrhi::IDevice* device, nvrhi::ICommandList* commandList, const std::string& csvPath)
-    {
-        if (csvPath.empty()) return;
-        if (!m_initialized)
-        {
-            m_initialized = true;
-            m_csv.open(csvPath);
-            if (!m_csv) { donut::log::error("Cannot open GPU timing CSV: %s", csvPath.c_str()); return; }
-            for (auto& frame : m_frames)
-                for (auto& query : frame.queries)
-                {
-                    query = device->createTimerQuery();
-                    if (!query) { donut::log::error("GPU timer query allocation failed"); return; }
-                }
-            m_csv << "Frame";
-            for (auto name : c_Names) m_csv << ',' << name << "_ms";
-            m_csv << '\n' << std::fixed << std::setprecision(6);
-            m_available = true;
-        }
-        if (!m_available) return;
-        Collect(device);
-        ++m_frameNumber;
-        for (size_t i = 0; i < m_frames.size(); ++i)
-        {
-            auto& frame = m_frames[i];
-            if (frame.pending) continue;
-            m_current = int(i);
-            frame.number = m_frameNumber;
-            frame.ended.fill(false);
-            for (auto& query : frame.queries) device->resetTimerQuery(query);
-            Begin(commandList, Stage::Total);
-            return;
-        }
-        ++m_dropped;
-    }
+    // srcloc == nullptr interns by name (for dynamic names).
+    void Begin(nvrhi::ICommandList* commandList, const char* name, const tracy::SourceLocationData* srcloc = nullptr);
+    void End(nvrhi::ICommandList* commandList);
 
-    void Begin(nvrhi::ICommandList* commandList, Stage stage)
-    {
-        if (m_current >= 0) commandList->beginTimerQuery(m_frames[m_current].queries[size_t(stage)]);
-    }
-    void End(nvrhi::ICommandList* commandList, Stage stage)
-    {
-        if (m_current < 0) return;
-        auto& frame = m_frames[m_current];
-        commandList->endTimerQuery(frame.queries[size_t(stage)]);
-        frame.ended[size_t(stage)] = true;
-        if (stage == Stage::Total) { frame.pending = true; m_current = -1; }
-    }
+    // Tracy-only "Frame" zone (no marker) annotated with FrameNumber(); closed with End. The viewer keys notes by query id, so
+    // only the last 16K frames of a capture keep theirs; a handshake racing the first Present can offset labels by one.
+    void BeginFrameZone(nvrhi::ICommandList* commandList);
 
-private:
-    static constexpr size_t c_StageCount = size_t(Stage::Count);
-    static constexpr std::array<const char*, c_StageCount> c_Names = {
-        "Total", "BUILD", "LightsBaker", "FILL", "Guides", "RRPrepare", "RR", "PostProcess", "VBufferExport" };
-    struct Frame
+    // The number Tracy's frame bar shows for the frame being recorded.
+    uint64_t FrameNumber();
+
+    class Scope
     {
-        std::array<nvrhi::TimerQueryHandle, c_StageCount> queries;
-        std::array<bool, c_StageCount> ended{};
-        uint64_t number = 0;
-        bool pending = false;
+    public:
+        Scope(nvrhi::ICommandList* commandList, const char* name, const tracy::SourceLocationData* srcloc = nullptr) : m_commandList(commandList) { Begin(commandList, name, srcloc); }
+        ~Scope() { End(m_commandList); }
+        Scope(const Scope&) = delete;
+        Scope& operator=(const Scope&) = delete;
+    private:
+        nvrhi::ICommandList* m_commandList;
     };
-    void Collect(nvrhi::IDevice* device)
-    {
-        for (auto& frame : m_frames)
-        {
-            if (!frame.pending) continue;
-            bool ready = true;
-            for (size_t i = 0; i < c_StageCount; ++i)
-                if (frame.ended[i]) ready &= device->pollTimerQuery(frame.queries[i]);
-            if (!ready) continue;
-            m_csv << frame.number;
-            for (size_t i = 0; i < c_StageCount; ++i)
-                m_csv << ',' << (frame.ended[i] ? 1000.0 * device->getTimerQueryTime(frame.queries[i]) : -1.0);
-            m_csv << '\n';
-            frame.pending = false;
-            if (++m_collected % 120 == 0)
-            {
-                m_csv.flush();
-                donut::log::info("GPU profiling: collected=%llu dropped=%llu", (unsigned long long)m_collected, (unsigned long long)m_dropped);
-            }
-        }
-    }
-    std::array<Frame, 8> m_frames;
-    std::ofstream m_csv;
-    uint64_t m_frameNumber = 0, m_collected = 0, m_dropped = 0;
-    int m_current = -1;
-    bool m_initialized = false, m_available = false;
-};
+}
+
+#define RTXPT_GPU_CONCAT_IMPL(a, b) a##b
+#define RTXPT_GPU_CONCAT(a, b) RTXPT_GPU_CONCAT_IMPL(a, b)
+
+#ifdef TRACY_ENABLE
+#define RTXPT_GPU_SCOPE_IMPL(commandList, name, var) \
+    static constexpr tracy::SourceLocationData RTXPT_GPU_CONCAT(var, _srcloc) { name, TracyFunction, TracyFile, (uint32_t)TracyLine, 0 }; \
+    GpuProfiler::Scope var(commandList, name, &RTXPT_GPU_CONCAT(var, _srcloc))
+#else
+#define RTXPT_GPU_SCOPE_IMPL(commandList, name, var) GpuProfiler::Scope var(commandList, name)
+#endif
+
+// Scoped marker + Tracy GPU zone; name must be a string literal (use Begin/End for dynamic names).
+#define RTXPT_GPU_SCOPE(commandList, name) RTXPT_GPU_SCOPE_IMPL(commandList, name, RTXPT_GPU_CONCAT(_rtxpt_gpu_scope_, __COUNTER__))
